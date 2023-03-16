@@ -1,0 +1,41 @@
+import os 
+import pandas as pd 
+import numpy as np
+import glob
+from pandas.io.excel import ExcelWriter
+from matplotlib import pyplot as plt
+#读取一个文件夹里面的CSV文件，并且把所以文件合并成一个，筛选出有用的列
+
+df_all = pd.DataFrame()
+useful_cols = ['Date', 'Time', 'SerialNum', 'TestDesc', 'PassFail', 'ResValue', 'ResMin', 'ResMax', 
+            'SetValue0','SetValue1','SetValue2', 'SetValue4','SetValue5']
+test_list = ["VSG Power Accuracy High Outp","VSG Power Accuracy Low", "VSA Power Accuracy"]
+
+for i in glob.glob('D:\CertData_collect\Test python\IQXL03066_20190131\*.csv', recursive=True):
+    df = pd.read_csv(i, low_memory=False, parse_dates=[['Date', 'Time']], usecols=useful_cols)
+    df_all = pd.concat([df_all,df], ignore_index=True) #合并所有CSV成一个，筛选出有用的列
+    #df_all.to_excel("3066.xlsx" ,sheet_name="sheet1", index=False)
+
+    temp = df_all.loc[(df_all['SerialNum']=='IQXL03066') & (df_all["TestDesc"].isin(test_list)),:] #筛选出需要的VSA VSG
+    #temp = df_all.loc[['SerialNum']=='IQXL02939' & ['TestDesc'].isin(test_list),:]
+temp.to_excel("3066.xlsx" ,sheet_name="sheet1", index=False)
+
+
+#选一个937行的完整数据文件，然后切分成VSG HIGH ,VSG LOW,VSA 三个文件，并且把这三个sheet按照Freq，Power level 排序
+df = pd.read_excel(r"D:\CertData_collect\Test python\3066.xlsx") #将937列整的数据分切到不同的df,然后写入不同的sheet
+df_acc = df.groupby("TestDesc")
+
+df_vsg_low=df_acc.get_group('VSG Power Accuracy Low')#切需要的列里面的子项
+df_sort_vsg_low = df_vsg_low.sort_values(["SetValue5","SetValue0","SetValue2"],ascending=[True,True,True])#多列排序
+    
+df_vsg_high=df_acc.get_group('VSG Power Accuracy High Outp')
+df_sort_vsg_high = df_vsg_high.sort_values(["SetValue4","SetValue0","SetValue2"],ascending=[True,True,True])
+
+df_vsa=df_acc.get_group('VSA Power Accuracy')
+df_sort_vsa = df_vsa.sort_values(["SetValue4","SetValue0","SetValue2"],ascending=[True,True,True])
+
+    
+with pd.ExcelWriter('3066_vsghighlow_vsa.xlsx') as writer:# 将多个df写到不同的sheet
+    df_sort_vsg_low.to_excel(writer,sheet_name="VSG_Low", index=False)
+    df_sort_vsg_high.to_excel(writer,sheet_name="VSG_High", index=False)
+    df_sort_vsa.to_excel(writer,sheet_name="VSA", index=False)
